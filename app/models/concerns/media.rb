@@ -26,6 +26,7 @@ module Media
     }
 
     update_index("media##{name.underscore}") { self }
+    update_algolia('AlgoliaMediaIndex')
 
     has_and_belongs_to_many :genres
     has_and_belongs_to_many :categories,
@@ -37,7 +38,7 @@ module Media
     has_many :library_entries, as: 'media', dependent: :destroy,
                                inverse_of: :media
     has_many :media_reactions, dependent: :destroy
-    has_many :mappings, as: 'media', dependent: :destroy
+    has_many :mappings, as: 'item', dependent: :destroy
     has_many :reviews, as: 'media', dependent: :destroy
     has_many :media_relationships,
       class_name: 'MediaRelationship',
@@ -49,7 +50,14 @@ module Media
       dependent: :destroy
     has_many :favorites, as: 'item', dependent: :destroy,
                          inverse_of: :item
+    has_many :media_attributes,
+      class_name: 'MediaAttribute',
+      dependent: :destroy
+    has_many :media_attribute_votes,
+      class_name: 'MediaAttributeVote',
+      dependent: :destroy
     delegate :year, to: :start_date, allow_nil: true
+    serialize :release_schedule, IceCube::Schedule
 
     # finished: end date has passed
     # current: currently between start and end date
@@ -77,6 +85,17 @@ module Media
     after_commit :setup_feed, on: :create
   end
 
+  class_methods do
+    def by_mapping(site, id)
+      joins("LEFT OUTER JOIN mappings m ON m.item_type = '#{name}' AND m.item_id = anime.id")
+        .where('m.external_site = ? AND m.external_id = ?', site, id)
+    end
+
+    def find_by_mapping(site, id)
+      by_mapping(site, id).first
+    end
+  end
+
   def slug_candidates
     [
       -> { canonical_title },
@@ -84,9 +103,13 @@ module Media
     ]
   end
 
+  def mapping_for(site)
+    mappings.where(external_site: site).first
+  end
+
   # How long the series ran for, or nil if the start date is unknown
   def run_length
-    (end_date || Date.today) - start_date if start_date
+    (end_date || Date.today) - start_date if start_date && start_date.past?
   end
 
   def status
@@ -97,12 +120,24 @@ module Media
     return :unreleased if start_date&.future?
   end
 
+  def next_release
+    release_schedule&.next_occurrence
+  end
+
   def feed
     @feed ||= MediaFeed.new(self.class.name, id)
   end
 
+  def airing_feed
+    @airing_feed ||= MediaAiringFeed.new(self.class.name, id)
+  end
+
   def setup_feed
     feed.setup!
+  end
+
+  def poster_image_changed?
+    poster_image.dirty?
   end
 
   private

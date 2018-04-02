@@ -13,6 +13,7 @@
 #  cover_image_content_type  :string
 #  cover_image_file_name     :string
 #  cover_image_file_size     :integer
+#  cover_image_meta          :text
 #  cover_image_processing    :boolean
 #  cover_image_top_offset    :integer          default(0), not null
 #  cover_image_updated_at    :datetime
@@ -24,14 +25,15 @@
 #  poster_image_content_type :string
 #  poster_image_file_name    :string
 #  poster_image_file_size    :integer
+#  poster_image_meta         :text
 #  poster_image_updated_at   :datetime
 #  rating_frequencies        :hstore           default({}), not null
 #  rating_rank               :integer
 #  slug                      :string           not null, indexed
 #  start_date                :date
-#  started_airing_date_known :boolean          default(TRUE), not null
 #  subtype                   :integer
 #  synopsis                  :text
+#  tba                       :string
 #  titles                    :hstore           default({}), not null
 #  user_count                :integer          default(0), not null
 #  created_at                :datetime         not null
@@ -50,6 +52,8 @@ class Drama < ApplicationRecord
   include Episodic
 
   enum subtype: %i[drama movie special]
+  has_many :media_attributes, through: :dramas_media_attributes
+  has_many :dramas_media_attributes
 
   has_attached_file :cover_image,
     url: '/:class/:attachment/:id/:style.:content_type_extension'

@@ -9,11 +9,13 @@
 #  length                 :integer
 #  media_type             :string           not null, indexed => [media_id]
 #  number                 :integer
+#  relative_number        :integer
 #  season_number          :integer
 #  synopsis               :text
 #  thumbnail_content_type :string(255)
 #  thumbnail_file_name    :string(255)
 #  thumbnail_file_size    :integer
+#  thumbnail_meta         :text
 #  thumbnail_updated_at   :datetime
 #  titles                 :hstore           default({}), not null
 #  created_at             :datetime         not null
@@ -29,7 +31,8 @@
 class Episode < ApplicationRecord
   include Titleable
 
-  belongs_to :media, polymorphic: true, touch: true
+  belongs_to :media, polymorphic: true
+  has_many :videos
 
   has_attached_file :thumbnail
 
@@ -40,6 +43,13 @@ class Episode < ApplicationRecord
     content_type: %w[image/jpg image/jpeg image/png]
   }
 
+  scope :for_progress, ->(progress) do
+    order(:season_number, :number).limit(progress)
+  end
+  scope :for_range, ->(range) do
+    where(number: range)
+  end
+
   def self.length_mode
     mode, count = order(count: :desc).group(:length).count.first
     { mode: mode, count: count }
@@ -49,6 +59,20 @@ class Episode < ApplicationRecord
     average(:length)
   end
 
+  def self.create_defaults(count)
+    episodes = ((1..count).to_a - pluck(:number)).map do |n|
+      new(number: n, season_number: 1, titles: { en_jp: "Episode #{n}" })
+    end
+    transaction { episodes.each(&:save) }
+    where("number > #{count}").destroy_all
+  end
+
+  def feed
+    EpisodeFeed.new(id)
+  end
+
+  MediaTotalLengthCallbacks.hook(self)
+
   before_save do
     self.synopsis = Sanitize.fragment(synopsis, Sanitize::Config::RESTRICTED)
   end
@@ -57,4 +81,6 @@ class Episode < ApplicationRecord
   end
   after_save { media.recalculate_episode_length! if length_changed? }
   after_destroy { media.recalculate_episode_length! }
+
+  after_commit(on: :create) { feed.setup! }
 end

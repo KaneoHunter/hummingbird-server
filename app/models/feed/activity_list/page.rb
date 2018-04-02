@@ -2,7 +2,7 @@ class Feed
   class ActivityList
     class Page
       # Verbs which get their groups stripped to one activity
-      STRIPPED_VERBS = Set.new(%w[post comment follow review]).freeze
+      STRIPPED_VERBS = Set.new(%w[post comment follow review media_reaction]).freeze
 
       attr_reader :opts, :data
 
@@ -16,6 +16,7 @@ class Feed
       # Collapse the waveform, apply the processing to the data
       def to_a
         res = data
+        return [] unless data
         res = apply_selects(res, opts[:fast_selects] || [])
         res = strip_unused(res)
         unless opts[:includes].blank?
@@ -31,19 +32,24 @@ class Feed
       private
 
       # Apply a list of selects to the list of activities
-      def apply_selects(activities, selects)
+      def apply_selects(activities, selects, grouped = false)
         return activities if selects.empty?
         # We use map+reject(blank) so that we can modify the activities in the
         # groups
         activities = activities.lazy.map do |act|
           if act['activities'] # recurse into activity groups
             catch(:remove_group) do
-              act['activities'] = apply_selects(act['activities'], selects)
+              act['activities'] = apply_selects(act['activities'], selects, true)
               act
             end
-          else # Activity
+          elsif grouped # Activity inside an ActivityGroup
             next unless selects.all? { |proc| proc.call(act) }
             act
+          else # Top-level activities
+            catch(:remove_group) do
+              next unless selects.all? { |proc| proc.call(act) }
+              act
+            end
           end
         end
         activities = activities.reject do |act|
@@ -68,7 +74,7 @@ class Feed
       # Run it through the StreamRails::Enrich process
       def enrich(activities, includes)
         enricher = StreamRails::Enrich.new(includes)
-        if opts[:aggregated]
+        if activities.first&.key?('activities')
           enricher.enrich_aggregated_activities(activities)
         else
           enricher.enrich_activities(activities)

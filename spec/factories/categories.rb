@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/LineLength
 # == Schema Information
 #
 # Table name: categories
@@ -24,8 +25,9 @@
 #  index_categories_on_parent_id  (parent_id)
 #  index_categories_on_slug       (slug)
 #
+# rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :category do
     title { Faker::Name.name }
   end

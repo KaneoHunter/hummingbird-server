@@ -2,7 +2,7 @@ class GroupPolicy < ApplicationPolicy
   include GroupPermissionsHelpers
 
   def create?
-    !!user
+    user ? true : false
   end
 
   def update?
@@ -15,16 +15,12 @@ class GroupPolicy < ApplicationPolicy
 
   def editable_attributes(all)
     return all if is_admin?
-
-    all - %i[members_count leaders_count neighbors_count rules_formatted
-             featured name]
+    all - %i[members_count leaders_count neighbors_count rules_formatted featured name]
   end
 
   def creatable_attributes(all)
     return all if is_admin?
-
-    all - %i[members_count leaders_count neighbors_count rules_formatted
-             featured]
+    all - %i[members_count leaders_count neighbors_count rules_formatted featured]
   end
 
   def group
@@ -33,8 +29,18 @@ class GroupPolicy < ApplicationPolicy
 
   class Scope < Scope
     def resolve
+      return scope if user&.has_role?(:admin, Group)
       return scope.visible_for(user) if see_nsfw?
       scope.sfw.visible_for(user)
+    end
+  end
+
+  class AlgoliaScope < AlgoliaScope
+    def resolve
+      group_ids = GroupMember.joins(:group).merge(Group.closed).for_user(user).pluck(:group_id)
+      groups = group_ids.map { |id| "id = #{id}" }
+      visible_groups = [*groups, 'privacy:open', 'privacy:restricted'].compact.join(' OR ')
+      see_nsfw? ? visible_groups : "(#{visible_groups}) AND NOT nsfw:true"
     end
   end
 end

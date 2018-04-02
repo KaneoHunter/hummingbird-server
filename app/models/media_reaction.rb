@@ -1,8 +1,10 @@
+# rubocop:disable Metrics/LineLength
 # == Schema Information
 #
 # Table name: media_reactions
 #
 #  id               :integer          not null, primary key
+#  deleted_at       :datetime         indexed
 #  media_type       :string           not null, indexed => [media_id, user_id]
 #  progress         :integer          default(0), not null
 #  reaction         :string(140)
@@ -19,12 +21,11 @@
 # Indexes
 #
 #  index_media_reactions_on_anime_id                             (anime_id)
+#  index_media_reactions_on_deleted_at                           (deleted_at)
 #  index_media_reactions_on_drama_id                             (drama_id)
-#  index_media_reactions_on_library_entry_id
-#                                                    (library_entry_id)
+#  index_media_reactions_on_library_entry_id                     (library_entry_id)
 #  index_media_reactions_on_manga_id                             (manga_id)
-#  index_media_reactions_on_media_type_and_media_id_and_user_id
-#                                           (media_type,media_id,user_id) UNIQUE
+#  index_media_reactions_on_media_type_and_media_id_and_user_id  (media_type,media_id,user_id) UNIQUE
 #  index_media_reactions_on_user_id                              (user_id)
 #
 # Foreign Keys
@@ -35,11 +36,14 @@
 #  fk_rails_bbc29d526d  (library_entry_id => library_entries.id)
 #  fk_rails_db814b132f  (anime_id => anime.id)
 #
+# rubocop:enable Metrics/LineLength
 
-class MediaReaction < ActiveRecord::Base
+class MediaReaction < ApplicationRecord
   include WithActivity
 
-  belongs_to :user, required: true
+  acts_as_paranoid
+
+  belongs_to :user, required: true, counter_cache: true
   belongs_to :media, polymorphic: true, required: true
   belongs_to :anime
   belongs_to :manga
@@ -47,7 +51,7 @@ class MediaReaction < ActiveRecord::Base
   belongs_to :library_entry, required: true
   has_many :votes, class_name: 'MediaReactionVote', dependent: :destroy
 
-  validates :media_id, uniqueness: { scope: %i[user_id media_type] }
+  validates :media_id, uniqueness: { scope: %i[user_id media_type] }, unless: 'deleted_at.present?'
   validates :media, polymorphism: { type: Media }
   validates :reaction, length: { maximum: 140 }, allow_nil: false
 
@@ -58,12 +62,16 @@ class MediaReaction < ActiveRecord::Base
     self.progress = library_entry&.progress
   end
 
+  before_update do
+    votes.destroy_all if reaction_changed?
+  end
+
   def stream_activity
     user.profile_feed.activities.new(
       progress: progress,
       updated_at: updated_at,
       up_votes_count: up_votes_count,
-      to: [media.feed]
+      to: [media.feed, GlobalFeed.new]
     )
   end
 

@@ -7,6 +7,7 @@
 #  disabled_reason    :string
 #  encrypted_token    :string
 #  encrypted_token_iv :string
+#  session_data       :text
 #  share_from         :boolean          default(FALSE), not null
 #  share_to           :boolean          default(FALSE), not null
 #  sync_to            :boolean          default(FALSE), not null
@@ -42,8 +43,17 @@ class LinkedAccount < ApplicationRecord
 
     in_namespace = type.start_with?('LinkedAccount')
     is_descendant = type.safe_constantize <= LinkedAccount
-    unless in_namespace && is_descendant
-      errors.add(:type, 'must be a LinkedAccount class')
-    end
+    errors.add(:type, 'must be a LinkedAccount class') unless in_namespace && is_descendant
+  end
+
+  def self.without_syncing(reason = nil)
+    sync_enabled = where(sync_to: true)
+    sync_enabled.update_all(sync_to: false, disabled_reason: reason)
+    yield
+    sync_enabled.update_all(sync_to: true, disabled_reason: nil)
+  end
+
+  def self.disable_syncing_for(user, reason = nil, &block)
+    where(user: user).without_syncing(reason, &block)
   end
 end

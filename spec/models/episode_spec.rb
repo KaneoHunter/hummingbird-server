@@ -9,11 +9,13 @@
 #  length                 :integer
 #  media_type             :string           not null, indexed => [media_id]
 #  number                 :integer
+#  relative_number        :integer
 #  season_number          :integer
 #  synopsis               :text
 #  thumbnail_content_type :string(255)
 #  thumbnail_file_name    :string(255)
 #  thumbnail_file_size    :integer
+#  thumbnail_meta         :text
 #  thumbnail_updated_at   :datetime
 #  titles                 :hstore           default({}), not null
 #  created_at             :datetime         not null
@@ -32,6 +34,7 @@ RSpec.describe Episode, type: :model do
   subject { create(:episode, media: anime) }
   let(:anime) { create(:anime) }
 
+  it { should have_many(:videos) }
   it { should validate_presence_of(:media) }
   it { should validate_presence_of(:number) }
   it { should validate_presence_of(:season_number) }

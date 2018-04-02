@@ -9,11 +9,13 @@
 #  length                 :integer
 #  media_type             :string           not null, indexed => [media_id]
 #  number                 :integer
+#  relative_number        :integer
 #  season_number          :integer
 #  synopsis               :text
 #  thumbnail_content_type :string(255)
 #  thumbnail_file_name    :string(255)
 #  thumbnail_file_size    :integer
+#  thumbnail_meta         :text
 #  thumbnail_updated_at   :datetime
 #  titles                 :hstore           default({}), not null
 #  created_at             :datetime         not null
@@ -26,7 +28,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :episode do
     association :media, factory: :anime, strategy: :build
     titles { { en_jp: Faker::Name.name } }

@@ -4,12 +4,19 @@ module Episodic
   def recalculate_episode_length!
     # Try for the statistical mode (most common value) of episode lengths
     length, num = episodes.length_mode.values_at(:mode, :count)
+
+    # use length if num is nil
+    update(episode_length: length) if num.nil?
+    return if num.nil?
+
     # If it's less than half of episodes, use average instead
-    if episode_count && num < (episode_count / 2)
-      length = episodes.length_average
-    end
+    length = episodes.length_average if episode_count && num < (episode_count / 2)
 
     update(episode_length: length)
+  end
+
+  def recalculate_total_length!
+    update(total_length: episodes.sum(:length))
   end
 
   def unit(number)
@@ -18,11 +25,7 @@ module Episodic
 
   def default_progress_limit
     # Weekly with a margin
-    if run_length
-      (run_length.to_i / 7) + 5
-    else
-      100
-    end
+    run_length ? (run_length.to_i / 7) + 5 : 100
   end
 
   included do

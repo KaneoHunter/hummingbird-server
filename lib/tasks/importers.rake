@@ -1,4 +1,12 @@
 namespace :importers do
+  namespace :media_attributes do
+    require 'media_attributes_import/seed_attributes'
+    desc 'Create Initial Attributes and Associate with Media'
+    task seed: :environment do |_t|
+      puts 'Create Initial Attributes and Associate with Media'
+      MediaAttributesImport::Seed.new.run!
+    end
+  end
   namespace :anidb do
     require 'anidb_category_import/category_importer'
     require 'anidb_category_import/media_importer'
@@ -64,12 +72,12 @@ namespace :importers do
   desc 'Import the bcmoe.json file from disk or (by default) off because.moe'
   task :bcmoe, [:filename] => [:environment] do |_t, args|
     # Load the JSON
-    json_file = open(args[:filename] || 'http://because.moe/bcmoe.json').read
+    json_file = open(args[:filename] || 'https://bcmoe.blob.core.windows.net/assets/us.json').read
     bcmoe = JSON.parse(json_file).map(&:deep_symbolize_keys)
 
     # Create the streamers
     puts '=> Creating Streamers'
-    sites = bcmoe.map { |x| x[:sites].keys }.flatten.uniq
+    sites = bcmoe['shows'].map { |x| x[:sites].keys }.flatten.uniq
     sites = sites.map do |site|
       puts site
       [site, Streamer.where(site_name: site.to_s.titleize).first_or_create]
@@ -79,16 +87,16 @@ namespace :importers do
     # Load the data
     puts '=> Loading Data'
     Chewy.strategy(:atomic) do
-      bcmoe.each do |show|
-        result = Anime.fuzzy_find(show[:name])
+      bcmoe['shows'].each do |show|
+        result = Mapping.guess(Anime, show[:name])
 
         # Shit results?  Let humans handle it!
-        if result.nil? || result._score <= 2
+        if result.nil?
           next puts("      #{show[:name]} => #{show[:sites]}")
         end
 
-        anime = result._object
-        confidence = [result._score, 5].min.floor
+        anime = result
+        confidence = 5
         # Handle Spanish Hulu bullshit
         spanish = show[:name].include?('(Espa')
         dubs = spanish ? %w[es] : %w[ja]

@@ -12,25 +12,28 @@
 #  cover_image_content_type  :string(255)
 #  cover_image_file_name     :string(255)
 #  cover_image_file_size     :integer
+#  cover_image_meta          :text
 #  cover_image_processing    :boolean
 #  cover_image_top_offset    :integer          default(0), not null
 #  cover_image_updated_at    :datetime
 #  end_date                  :date
 #  episode_count             :integer
+#  episode_count_guess       :integer
 #  episode_length            :integer
 #  favorites_count           :integer          default(0), not null
 #  popularity_rank           :integer
 #  poster_image_content_type :string(255)
 #  poster_image_file_name    :string(255)
 #  poster_image_file_size    :integer
+#  poster_image_meta         :text
 #  poster_image_updated_at   :datetime
 #  rating_frequencies        :hstore           default({}), not null
 #  rating_rank               :integer
 #  slug                      :string(255)      indexed
 #  start_date                :date
-#  started_airing_date_known :boolean          default(TRUE), not null
 #  subtype                   :integer          default(1), not null
 #  synopsis                  :text             default(""), not null
+#  tba                       :string
 #  titles                    :hstore           default({}), not null
 #  user_count                :integer          default(0), not null, indexed
 #  created_at                :datetime         not null
@@ -59,6 +62,8 @@ class Anime < ApplicationRecord
   has_many :anime_productions, dependent: :destroy
   has_many :anime_characters, dependent: :destroy
   has_many :anime_staff, dependent: :destroy
+  has_many :media_attributes, through: :anime_media_attributes
+  has_many :anime_media_attributes
   alias_attribute :show_type, :subtype
 
   rails_admin { fields :episode_count }
@@ -92,6 +97,10 @@ class Anime < ApplicationRecord
     end
   end
 
+  def season_changed?
+    start_date_changed?
+  end
+
   # Season year is the year, adjusted so that December is part of the next year
   def season_year
     if start_date.try(:month) == 12
@@ -99,6 +108,17 @@ class Anime < ApplicationRecord
     else
       year
     end
+  end
+  alias_method :season_year_changed?, :season_changed?
+  alias_method :year_changed?, :season_changed?
+
+  def update_unit_count_guess(guess)
+    return if episode_count || (episode_count_guess && episode_count_guess > guess)
+    update(episode_count_guess: guess)
+  end
+
+  def self.unit_class
+    Episode
   end
 
   def self.fuzzy_find(title)
@@ -112,9 +132,19 @@ class Anime < ApplicationRecord
   end
 
   before_save do
+    self.episode_count_guess = nil if episode_count
+
     if episode_count == 1
       self.start_date = end_date if start_date.nil? && !end_date.nil?
       self.end_date = start_date if end_date.nil? && !start_date.nil?
+    end
+  end
+
+  after_save do
+    if episode_count_guess_changed? && episodes.length != episode_count_guess
+      episodes.create_defaults(episode_count_guess || 0)
+    elsif episode_count_changed? && episodes.length != episode_count
+      episodes.create_defaults(episode_count || 0)
     end
   end
 end

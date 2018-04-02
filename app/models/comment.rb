@@ -5,14 +5,16 @@
 #
 #  id                :integer          not null, primary key
 #  blocked           :boolean          default(FALSE), not null
-#  content           :text             not null
-#  content_formatted :text             not null
+#  content           :text
+#  content_formatted :text
 #  deleted_at        :datetime         indexed
 #  edited_at         :datetime
+#  embed             :jsonb
 #  likes_count       :integer          default(0), not null
 #  replies_count     :integer          default(0), not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
+#  ao_id             :string
 #  parent_id         :integer          indexed
 #  post_id           :integer          not null, indexed
 #  user_id           :integer          not null
@@ -32,13 +34,15 @@
 class Comment < ApplicationRecord
   include WithActivity
   include ContentProcessable
+  include ContentEmbeddable
 
   acts_as_paranoid
   resourcify
   counter_culture :post, column_name: ->(model) {
     'top_level_comments_count' if model.parent.blank?
-  }
+  }, execute_after_commit: true
   processable :content, LongPipeline
+  embed_links_in :content, to: :embed
 
   belongs_to :user, required: true, counter_cache: true
   belongs_to :post, required: true, counter_cache: true, touch: true
@@ -47,22 +51,30 @@ class Comment < ApplicationRecord
   has_many :replies, class_name: 'Comment', foreign_key: 'parent_id',
                      dependent: :destroy
   has_many :likes, class_name: 'CommentLike', dependent: :destroy
+  has_many :uploads, as: 'owner', dependent: :destroy
 
   scope :in_group, ->(group) { joins(:post).merge(Post.in_group(group)) }
 
-  validates :content, :content_formatted, presence: true
   validate :no_grandparents
+  validates :content, :content_formatted, presence: true, unless: :uploads
+  validates :uploads, presence: true, unless: :content
   validates :content, length: { maximum: 9_000 }
+  validates :post, active_ama: {
+    message: 'cannot make any more comments on this AMA',
+    user: :user
+  }
 
   def stream_activity
     to = []
     to << post.user.notifications unless post.user == user
     to << parent&.user&.notifications unless parent&.user == user
     to += mentioned_users.map(&:notifications)
-    to += post.other_feeds
-    to += post.target_timelines
+    if parent.blank?
+      to += post.other_feeds
+      to += post.target_timelines
+      to << post.target_feed
+    end
     to << post.comments_feed
-    to << post.target_feed
     to.compact!
     post.feed.activities.new(
       reply_to_user: (parent&.user || post&.user),
@@ -77,7 +89,7 @@ class Comment < ApplicationRecord
   end
 
   def mentioned_users
-    User.by_name(processed_content[:mentioned_usernames])
+    User.where(id: processed_content[:mentioned_users])
   end
 
   def no_grandparents
@@ -90,6 +102,6 @@ class Comment < ApplicationRecord
   end
   after_create do
     user.update_feed_completed!
-    #PostFollow.create(user: user, post: post)
+    # PostFollow.create(user: user, post: post)
   end
 end

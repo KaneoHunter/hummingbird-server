@@ -1,11 +1,9 @@
 class GlobalFeed < Feed
-  include MediaUpdatesFilterable
-
-  def initialize(*)
-    super('global')
+  def read_target
+    %w[global future]
   end
 
-  def stream_feed_for(filter: nil, type: :flat)
-    super(filter: filter, type: type)
+  def write_target
+    %w[global future]
   end
 end

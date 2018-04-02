@@ -37,11 +37,13 @@ RSpec.describe ListImport::MyAnimeListXML do
 
   context 'with a list' do
     subject do
-      ListImport::MyAnimeListXML.create(
-        input_file: file,
+      attachment = OpenStruct.new(url: file.path, content_type: 'application/gzip')
+      import = ListImport::MyAnimeListXML.create(
         strategy: :greater,
         user: build(:user)
       )
+      allow(import).to receive(:input_file).and_return(attachment)
+      import
     end
 
     describe '#count' do
@@ -52,6 +54,8 @@ RSpec.describe ListImport::MyAnimeListXML do
 
     describe '#each' do
       it 'should yield at least 100 times' do
+        anime = build(:anime)
+        allow(Mapping).to receive(:guess).and_return(anime)
         expect { |b|
           subject.each(&b)
         }.to yield_control.at_least(100)

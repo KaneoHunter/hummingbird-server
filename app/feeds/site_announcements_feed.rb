@@ -1,7 +1,5 @@
 class SiteAnnouncementsFeed < Feed
-  feed_type :notification
-
   def setup!
-    follow(SiteAnnouncementsGlobalFeed.new)
+    follow(SiteAnnouncementsGlobalFeed.new, scrollback: 1)
   end
 end

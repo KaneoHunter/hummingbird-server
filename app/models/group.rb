@@ -8,11 +8,13 @@
 #  avatar_content_type      :string(255)
 #  avatar_file_name         :string(255)
 #  avatar_file_size         :integer
+#  avatar_meta              :text
 #  avatar_processing        :boolean          default(FALSE), not null
 #  avatar_updated_at        :datetime
 #  cover_image_content_type :string(255)
 #  cover_image_file_name    :string(255)
 #  cover_image_file_size    :integer
+#  cover_image_meta         :text
 #  cover_image_updated_at   :datetime
 #  featured                 :boolean          default(FALSE), not null
 #  last_activity_at         :datetime
@@ -31,6 +33,7 @@
 #  created_at               :datetime         not null
 #  updated_at               :datetime         not null
 #  category_id              :integer          not null, indexed
+#  pinned_post_id           :integer
 #
 # Indexes
 #
@@ -40,6 +43,7 @@
 # Foreign Keys
 #
 #  fk_rails_a61500b09c  (category_id => group_categories.id)
+#  fk_rails_ae0dbbc874  (pinned_post_id => posts.id)
 #
 # rubocop:enable Metrics/LineLength
 
@@ -57,6 +61,7 @@ class Group < ApplicationRecord
 
   update_index('groups#group') { self }
   update_index('users#group_member') { members }
+  update_algolia('AlgoliaGroupsIndex')
 
   scope :public_visible, ->() { open.or(restricted) }
   scope :sfw, ->() { where(nsfw: false).where.not(category_id: 9) }
@@ -78,6 +83,7 @@ class Group < ApplicationRecord
   has_many :bans, class_name: 'GroupBan', dependent: :destroy
   has_many :action_logs, class_name: 'GroupActionLog', dependent: :destroy
   belongs_to :category, class_name: 'GroupCategory'
+  belongs_to :pinned_post, class_name: 'Post', required: false
 
   validates :name, presence: true,
                    length: { in: 3..50 },
@@ -100,6 +106,16 @@ class Group < ApplicationRecord
 
   def feed
     GroupFeed.new(id)
+  end
+
+  # @return [Group,nil] the Kitsu group, if one exists
+  def self.kitsu
+    @kitsu ||= find_by(id: 1830)
+  end
+
+  before_validation do
+    self.nsfw = category_id == 9 if category_id_changed?
+    true
   end
 
   # Not bothering with teardown because the group ID won't be reused (so who

@@ -5,6 +5,8 @@
 #
 #  id                   :integer          not null, primary key
 #  url                  :string           not null
+#  created_at           :datetime
+#  updated_at           :datetime
 #  profile_link_site_id :integer          not null, indexed, indexed => [user_id]
 #  user_id              :integer          not null, indexed, indexed => [profile_link_site_id]
 #
@@ -21,7 +23,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :profile_link do
     association :user, strategy: :build
     association :profile_link_site, strategy: :build

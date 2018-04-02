@@ -8,6 +8,8 @@
 #  media_type  :string           not null, indexed => [media_id]
 #  subs        :string           default(["\"en\""]), not null, is an Array
 #  url         :string           not null
+#  created_at  :datetime
+#  updated_at  :datetime
 #  media_id    :integer          not null, indexed => [media_type]
 #  streamer_id :integer          not null, indexed
 #
@@ -29,6 +31,6 @@ class StreamingLink < ApplicationRecord
   validates :media, :streamer, :url, :subs, :dubs, presence: true
   validates :media, polymorphism: { type: Media }
 
-  scope :dubbed, -> (langs) { where('dubs @> ARRAY[?]::varchar[]', langs) }
-  scope :subbed, -> (langs) { where('subs @> ARRAY[?]::varchar[]', langs) }
+  scope :dubbed, ->(langs) { where('dubs @> ARRAY[?]::varchar[]', langs) }
+  scope :subbed, ->(langs) { where('subs @> ARRAY[?]::varchar[]', langs) }
 end

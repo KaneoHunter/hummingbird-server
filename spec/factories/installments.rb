@@ -7,6 +7,8 @@
 #  media_type   :string           not null, indexed => [media_id]
 #  position     :integer          default(0), not null
 #  tag          :string
+#  created_at   :datetime
+#  updated_at   :datetime
 #  franchise_id :integer          indexed
 #  media_id     :integer          indexed => [media_type]
 #
@@ -17,7 +19,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :installment do
     association :media, factory: :anime, strategy: :build
     franchise

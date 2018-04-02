@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/LineLength
 # == Schema Information
 #
 # Table name: stats
@@ -18,26 +19,18 @@
 #
 #  fk_rails_9e94901167  (user_id => users.id)
 #
+# rubocop:enable Metrics/LineLength
 
 class Stat < ApplicationRecord
   class MangaAmountConsumed < Stat
     include Stat::AmountConsumed
 
-    # recalculate
-    def media_column
+    def media_kind
       :manga
     end
 
-    def media_length
-      # this will change once we have a way
-      # to calculate how much time was spent reading
-      # a manga.
-      'manga.id'
-    end
-
-    # increment & decrement
-    def self.media_type
-      'Manga'
+    def unit_kind
+      :chapter
     end
   end
 end

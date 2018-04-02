@@ -1,5 +1,6 @@
 class LibraryEntriesController < ApplicationController
   include CustomControllerHelpers
+  before_action :authenticate_user!, only: %i[issues]
 
   def authorize_operation(operation)
     has_permission = operation_scope.find_each.all? do |entry|
@@ -13,9 +14,24 @@ class LibraryEntriesController < ApplicationController
     end
   end
 
+  def issues
+    entries =
+      LibraryEntry.where(user: user)
+                  .order('reaction_skipped, rating DESC NULLS LAST, finished_at DESC NULLS LAST')
+    missing = LibraryGapsService.new(entries).missing_engagement_ids
+    render json: missing
+  end
+
   def bulk_delete
     return unless authorize_operation(:destroy?)
-    operation_scope.destroy_all
+    # Disable syncing of full-library deletes
+    if params.dig(:filter, :user_id).present?
+      LinkedAccount.disable_syncing_for(user) do
+        operation_scope.destroy_all
+      end
+    else
+      operation_scope.destroy_all
+    end
     render nothing: true, status: 204
   end
 

@@ -7,6 +7,8 @@
 #  media_type   :string           not null, indexed => [media_id]
 #  position     :integer          default(0), not null
 #  tag          :string
+#  created_at   :datetime
+#  updated_at   :datetime
 #  franchise_id :integer          indexed
 #  media_id     :integer          indexed => [media_type]
 #
@@ -18,7 +20,8 @@
 # rubocop:enable Metrics/LineLength
 
 class Installment < ApplicationRecord
-  acts_as_list
+  include RankedModel
+  ranks :position
 
   validates :tag, length: { maximum: 40 }
   validates :media, polymorphism: { type: Media }

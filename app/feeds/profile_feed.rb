@@ -1,17 +1,11 @@
 class ProfileFeed < Feed
-  include MediaUpdatesFilterable
-  feed_name 'user'
+  prepend FanoutOptional
 
-  def no_fanout
-    @no_fanout = true
-    self
+  def write_target
+    ['user', id]
   end
 
-  def stream_activity_target(opts = {})
-    if @no_fanout
-      super({ type: :aggregated }.merge(opts))
-    else
-      super(opts)
-    end
+  def read_target
+    ['user_aggr', id]
   end
 end

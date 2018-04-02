@@ -1,10 +1,13 @@
 class BaseResource < JSONAPI::Resource
   abstract
   include BackportFindRecords
+  include IgnorePreloadingNils
   include AuthenticatedResource
   include Pundit::Resource
   include SearchableResource
   include ResourceInheritance
+
+  attributes :created_at, :updated_at
 
   def respond_to?(method_name, include_private = false)
     if method_name.to_s.end_with?('_id')

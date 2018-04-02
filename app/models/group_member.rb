@@ -4,6 +4,7 @@
 # Table name: group_members
 #
 #  id           :integer          not null, primary key
+#  hidden       :boolean          default(FALSE), not null
 #  rank         :integer          default(0), not null, indexed
 #  unread_count :integer          default(0), not null
 #  created_at   :datetime
@@ -56,7 +57,7 @@ class GroupMember < ApplicationRecord
   scope :sfw, ->() { joins(:group).merge(Group.sfw) }
 
   def has_permission?(perm)
-    permissions.for_permission(perm).exists?
+    permissions.for_permission(perm).exists? || permissions.for_permission(:owner).exists?
   end
 
   def leader?
@@ -78,11 +79,19 @@ class GroupMember < ApplicationRecord
     group.public_visible?
   end
 
-  after_create do
-    user.group_timeline.follow(group.feed)
+  after_commit(on: :create) do
+    user.timeline.follow(group.feed) unless hidden?
   end
 
-  after_destroy do
-    user.group_timeline.unfollow(group.feed)
+  after_commit(on: :update, if: :hidden_changed?) do
+    if hidden?
+      user.timeline.unfollow(group.feed)
+    else
+      user.timeline.follow(group.feed)
+    end
+  end
+
+  after_commit(on: :destroy) do
+    user.timeline.unfollow(group.feed)
   end
 end

@@ -8,6 +8,8 @@
 #  media_type  :string           not null, indexed => [media_id]
 #  subs        :string           default(["\"en\""]), not null, is an Array
 #  url         :string           not null
+#  created_at  :datetime
+#  updated_at  :datetime
 #  media_id    :integer          not null, indexed => [media_type]
 #  streamer_id :integer          not null, indexed
 #
@@ -22,7 +24,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :streaming_link do
     association :media, factory: :anime, strategy: :build
     streamer

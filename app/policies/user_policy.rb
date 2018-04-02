@@ -26,14 +26,20 @@ class UserPolicy < ApplicationPolicy
     if record == user
       all
     else
-      all - %i[email password confirmed previous_email language time_zone
-                country share_to_global title_language_preference sfw_filter]
+      all - %i[email password confirmed previous_email language time_zone country share_to_global
+               title_language_preference sfw_filter rating_system theme facebook_id has_password]
     end
   end
 
   class Scope < Scope
     def resolve
       scope.active.blocking(blocked_users)
+    end
+  end
+
+  class AlgoliaScope < AlgoliaScope
+    def resolve
+      blocked_users.map { |id| "id != #{id}" }.join(' AND ')
     end
   end
 end

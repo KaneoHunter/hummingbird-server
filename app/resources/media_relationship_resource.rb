@@ -9,4 +9,10 @@ class MediaRelationshipResource < BaseResource
 
   has_one :source, polymorphic: true
   has_one :destination, polymorphic: true
+
+  filters :source_type, :source_id, :destination_id
+
+  def self.sortable_fields(context)
+    super + %i[destination.start_date]
+  end
 end

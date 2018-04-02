@@ -7,6 +7,7 @@
 #  target_type :string           not null
 #  verb        :string           not null
 #  created_at  :datetime         not null, indexed
+#  updated_at  :datetime
 #  group_id    :integer          not null, indexed
 #  target_id   :integer          not null
 #  user_id     :integer          not null
@@ -23,7 +24,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :group_action_log do
     association :target, factory: :group_invite, strategy: :create
     association :group

@@ -7,6 +7,7 @@
 #  disabled_reason    :string
 #  encrypted_token    :string
 #  encrypted_token_iv :string
+#  session_data       :text
 #  share_from         :boolean          default(FALSE), not null
 #  share_to           :boolean          default(FALSE), not null
 #  sync_to            :boolean          default(FALSE), not null
@@ -26,7 +27,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :linked_account do
     association :user
     external_user_id 'toyhammered'

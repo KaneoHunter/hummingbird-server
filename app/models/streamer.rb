@@ -9,11 +9,15 @@
 #  logo_file_size    :integer
 #  logo_updated_at   :datetime
 #  site_name         :string(255)      not null
+#  created_at        :datetime
+#  updated_at        :datetime
 #
 # rubocop:enable Metrics/LineLength
 
 class Streamer < ApplicationRecord
   has_attached_file :logo
+  has_many :streaming_links
+  has_many :videos
 
   validates :site_name, presence: true
   validates_attachment :logo, content_type: {

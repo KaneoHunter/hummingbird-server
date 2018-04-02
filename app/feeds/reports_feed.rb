@@ -1,10 +1,9 @@
 class ReportsFeed < Feed
-  feed_type :aggregated
+  def write_target
+    ['reports_aggr', id]
+  end
 
-  def stream_activity_target(opts = {})
-    Feed::StreamFeed.new({
-      type: :aggregated,
-      name: _feed_name
-    }.merge(opts), id)
+  def read_target
+    ['reports_aggr', id]
   end
 end

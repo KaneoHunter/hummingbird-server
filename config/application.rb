@@ -45,9 +45,15 @@ module Kitsu
     # TODO: fix or kill rails_admin, bring this back
     # config.autoload_paths << "#{Rails.root}/lib"
 
+    # Set log level to LOG_LEVEL environment variable
+    config.log_level = ENV['LOG_LEVEL'] || :info
+
+    # Normally we wanna be API-only, but we mount some admin panels in, so... :(
     config.api_only = false
 
-    # Eable CORS
+    # Set up Flipper's Memoizer middleware
+    config.middleware.insert_before 0, 'Flipper::Middleware::Memoizer'
+    # Enable CORS
     config.middleware.insert_before 0, 'Rack::Cors' do
       allow do
         origins '*'
@@ -61,6 +67,9 @@ module Kitsu
     # Fancy new URLs for images
     config.paperclip_defaults = {
       url: '/system/:class/:attachment/:id/:style.:content_type_extension'
+    }
+    config.delayed_paperclip_defaults = {
+      queue: 'soon'
     }
 
     # Email Server
@@ -80,6 +89,7 @@ module Kitsu
 
     # Set ActiveJob adapter
     config.active_job.queue_adapter = :sidekiq
+    config.active_job.default_queue_name = :later
 
     # Configure Scaffold Generators
     config.generators do |g|

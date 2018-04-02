@@ -8,11 +8,13 @@
 #  avatar_content_type      :string(255)
 #  avatar_file_name         :string(255)
 #  avatar_file_size         :integer
+#  avatar_meta              :text
 #  avatar_processing        :boolean          default(FALSE), not null
 #  avatar_updated_at        :datetime
 #  cover_image_content_type :string(255)
 #  cover_image_file_name    :string(255)
 #  cover_image_file_size    :integer
+#  cover_image_meta         :text
 #  cover_image_updated_at   :datetime
 #  featured                 :boolean          default(FALSE), not null
 #  last_activity_at         :datetime
@@ -31,6 +33,7 @@
 #  created_at               :datetime         not null
 #  updated_at               :datetime         not null
 #  category_id              :integer          not null, indexed
+#  pinned_post_id           :integer
 #
 # Indexes
 #
@@ -40,10 +43,11 @@
 # Foreign Keys
 #
 #  fk_rails_a61500b09c  (category_id => group_categories.id)
+#  fk_rails_ae0dbbc874  (pinned_post_id => posts.id)
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :group do
     name { Faker::University.name }
     association :category, factory: :group_category, strategy: :build

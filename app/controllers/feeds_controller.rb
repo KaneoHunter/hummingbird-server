@@ -5,18 +5,17 @@ class FeedsController < ApplicationController
 
   def show
     response_json = stringify_activities(query.list)
-    response.headers['X-Feed-Reason'] = query.list.termination_reason
     render_jsonapi response_json
   end
 
   def mark_read
     activities = feed.activities.mark(:read, params[:_json])
-    render_jsonapi serialize_activities(activities)
+    render_jsonapi stringify_activities(activities)
   end
 
   def mark_seen
     activities = feed.activities.mark(:seen, params[:_json])
-    render_jsonapi serialize_activities(activities)
+    render_jsonapi stringify_activities(activities)
   end
 
   def destroy_activity
@@ -38,7 +37,7 @@ class FeedsController < ApplicationController
     @serializer ||= FeedSerializerService.new(
       list,
       including: params[:include]&.split(','),
-      stream_feed: underlying_split_feed,
+      feed: feed,
       # fields: params[:fields]&.split(','),
       context: context,
       base_url: request.url
@@ -55,11 +54,6 @@ class FeedsController < ApplicationController
 
   delegate :feed, to: :query
 
-  def underlying_split_feed
-    filter = params.dig(:filter, :kind)
-    query.split_feed.stream_feed_for(filter: filter)
-  end
-
   def authorize_feed!
     unless feed_visible?
       error = serialize_error(403, 'Not allowed to access that feed')
@@ -68,23 +62,27 @@ class FeedsController < ApplicationController
   end
 
   def feed_visible?
-    case params[:group]
-    when 'media', 'media_aggr'
+    case params[:group].sub(/_aggr\z/, '')
+    when 'media'
       media_type, media_id = params[:id].split('-')
       return false unless %w[Manga Anime Drama].include?(media_type)
       media = media_type.safe_constantize.find_by(id: media_id)
       media && show?(media)
-    when 'user', 'user_aggr'
+    when 'interest_timeline'
+      user_id, interest = params[:id].split('-')
+      return false unless %w[Manga Anime Drama].include?(interest)
+      user_id.to_i == current_user&.resource_owner_id
+    when 'user'
       user = User.find_by(id: params[:id])
       user && show?(user)
-    when 'group', 'group_aggr'
+    when 'group'
       group = Group.find_by(id: params[:id])
       group && show?(group)
     when 'site_announcements', 'notifications', 'timeline', 'group_timeline'
-      user = User.find_by(id: params[:id])
-      user == current_user&.resource_owner
+      params[:id].to_i == current_user&.resource_owner_id
+    when 'episode', 'chapter' then true
     when 'global' then true
-    when 'reports_aggr'
+    when 'reports'
       user = current_user&.resource_owner
       if params[:id] == 'global'
         # Is admin of something?

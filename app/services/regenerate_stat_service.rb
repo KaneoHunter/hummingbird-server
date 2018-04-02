@@ -1,11 +1,11 @@
 class RegenerateStatService
   class << self
-    def anime_genre_breakdown
-      user_stat(:anime, 'Stat::AnimeGenreBreakdown')
+    def anime_category_breakdown
+      user_stat(:anime, 'Stat::AnimeCategoryBreakdown')
     end
 
-    def manga_genre_breakdown
-      user_stat(:manga, 'Stat::MangaGenreBreakdown')
+    def manga_category_breakdown
+      user_stat(:manga, 'Stat::MangaCategoryBreakdown')
     end
 
     def anime_amount_consumed
@@ -35,10 +35,22 @@ class RegenerateStatService
     private
 
     def user_stat(media_column, stat_type)
-      User.where(id: LibraryEntry.select(:user_id).by_kind(media_column))
-          .find_each do |user|
-            user.stats.find_or_initialize_by(type: stat_type).recalculate!
-          end
+      users = User.where(id: LibraryEntry.select(:user_id).by_kind(media_column))
+      bar = progress_bar(stat_type, users.count)
+
+      users.find_each do |user|
+        bar.increment
+        user.stats.find_or_initialize_by(type: stat_type).recalculate!
+      end
+    end
+
+    def progress_bar(title, count)
+      ProgressBar.create(
+        title: title,
+        total: count,
+        output: STDERR,
+        format: '%a (%p%%) |%B| %E %t'
+      )
     end
   end
 end

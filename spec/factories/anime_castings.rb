@@ -6,6 +6,8 @@
 #  id                 :integer          not null, primary key
 #  locale             :string           not null, indexed => [anime_character_id, person_id]
 #  notes              :string
+#  created_at         :datetime
+#  updated_at         :datetime
 #  anime_character_id :integer          not null, indexed, indexed => [person_id, locale]
 #  licensor_id        :integer
 #  person_id          :integer          not null, indexed => [anime_character_id, locale], indexed
@@ -24,7 +26,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :anime_casting do
     locale 'en'
     association :anime_character, factory: :anime_character, strategy: :build

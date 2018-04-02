@@ -5,6 +5,9 @@ Rails.application.configure do
   # Code is not reloaded between requests.
   config.cache_classes = true
 
+  # Enable lograge
+  config.lograge.enabled = true
+
   # Eager load code on boot. This eager loads most of Rails and
   # your application in memory, allowing both threaded web servers
   # and those relying on copy on write to perform better.
@@ -61,8 +64,6 @@ Rails.application.configure do
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false
 
-  # Use S3 buckets from V2
-  # TODO: make the URL not suck
   config.paperclip_defaults = {
     storage: :s3,
     s3_credentials: {
@@ -83,7 +84,4 @@ Rails.application.configure do
 
   # Enable Rack-Attack middleware
   config.middleware.insert_after ActionDispatch::RemoteIp, Rack::Attack
-  
-  # Configure probes for Skylight
-  config.skylight.probes += %w[redis elasticsearch]
 end

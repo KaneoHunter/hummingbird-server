@@ -25,16 +25,6 @@ class MediaActivityService
     )
   end
 
-  def progress(progress, unit = nil)
-    return if progress.zero?
-    fill_defaults user.profile_feed.activities.new(
-      verb: 'progressed',
-      foreign_id: "LibraryEntry:#{library_entry.id}:progressed-#{progress}",
-      progress: progress,
-      unit: unit
-    )
-  end
-
   def reviewed(review)
     fill_defaults user.profile_feed.activities.new(
       foreign_id: review,
@@ -48,7 +38,7 @@ class MediaActivityService
       act.actor ||= user
       act.object ||= library_entry
       act.to ||= []
-      act.to << media&.feed
+      act.to << media&.feed&.no_fanout
       act.to << user.library_feed
       act.media ||= media
       act.nsfw ||= media.try(:nsfw?)

@@ -27,7 +27,7 @@ require 'rails_helper'
 RSpec.describe ListImport do
   class FakeImport < ListImport
     def each
-      media = FactoryGirl.create_list(:anime, 10)
+      media = FactoryBot.create_list(:anime, 10)
       100.times do |i|
         yield media[i], status: :current, progress: 1
       end
@@ -45,7 +45,7 @@ RSpec.describe ListImport do
   subject { build(:list_import) }
 
   it { should define_enum_for(:status) }
-  it { should belong_to(:user).touch }
+  it { should belong_to(:user) }
   it { should validate_presence_of(:user) }
   it { should define_enum_for(:strategy) }
   it { should validate_presence_of(:strategy) }

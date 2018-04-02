@@ -26,7 +26,7 @@ class ListImport < ApplicationRecord
   include Enumerable
   include WithActivity
 
-  belongs_to :user, required: true, touch: true
+  belongs_to :user, required: true
 
   enum strategy: %i[greater obliterate]
   enum status: %i[queued running failed completed]
@@ -43,9 +43,7 @@ class ListImport < ApplicationRecord
   def type_is_subclass
     in_namespace = type.start_with?('ListImport')
     is_descendant = type.safe_constantize <= ListImport
-    unless in_namespace && is_descendant
-      errors.add(:type, 'must be a ListImport class')
-    end
+    errors.add(:type, 'must be a ListImport class') unless in_namespace && is_descendant
   end
 
   # Apply the ListImport
@@ -59,25 +57,27 @@ class ListImport < ApplicationRecord
       input_file: input_file.to_s
     )
 
+    total = count
+
     # Last-ditch check for validity
     raise 'Import is invalid' unless valid?(:create)
 
-    yield({ status: :running, total: count, progress: 0 })
-    LibraryEntry.transaction do
+    yield({ status: :running, total: total, progress: 0 })
+    Chewy.strategy(:atomic) do
       each_with_index do |(media, data), index|
         next unless media.present?
         # Cap the progress
         limit = media.progress_limit || media.default_progress_limit
         data[:progress] = [data[:progress], limit].compact.min
         # Merge the library entries
-        le = LibraryEntry.where(user: user, media: media).first_or_initialize
+        le = LibraryEntry.where(user_id: user.id, media: media).first_or_initialize
         le.imported = true
         le = merged_entry(le, data)
         le.save! unless le.status.nil?
-        yield({ status: :running, total: count, progress: index + 1 })
+        yield({ status: :running, total: total, progress: index + 1 })
       end
     end
-    yield({ status: :completed, total: count, progress: count })
+    yield({ status: :completed, total: total, progress: total })
   rescue StandardError => e
     Raven.capture_exception(e)
     yield({
@@ -90,6 +90,8 @@ class ListImport < ApplicationRecord
 
   # Apply the ListImport while updating the model db every [frequency] times
   def apply!(frequency: 20)
+    return unless queued?
+
     apply do |info|
       # Apply every [frequency] updates unless the status is not :running
       if info[:status] != :running || (info[:progress] % frequency).zero?
@@ -97,6 +99,22 @@ class ListImport < ApplicationRecord
         yield info if block_given?
       end
     end
+
+    Stat::AnimeCategoryBreakdown.for_user(user).recalculate!
+    Stat::AnimeAmountConsumed.for_user(user).recalculate!
+    Stat::AnimeActivityHistory.for_user(user).recalculate!
+    Stat::MangaCategoryBreakdown.for_user(user).recalculate!
+    Stat::MangaAmountConsumed.for_user(user).recalculate!
+    Stat::MangaActivityHistory.for_user(user).recalculate!
+  end
+
+  def apply_async!(queue: 'now')
+    ListImportWorker.perform_async(id, queue: queue) unless running?
+  end
+
+  def retry_async!(queue: 'eventually')
+    update!(status: :queued)
+    ListImportWorker.perform_async(id, queue: queue)
   end
 
   def merged_entry(entry, data)
@@ -128,6 +146,6 @@ class ListImport < ApplicationRecord
   end
 
   after_commit(on: :create) do
-    ListImportWorker.perform_async(id)
+    apply_async!
   end
 end

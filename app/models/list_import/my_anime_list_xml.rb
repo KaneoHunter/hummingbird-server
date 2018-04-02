@@ -32,8 +32,7 @@ class ListImport
     }, presence: true
 
     def count
-      xml.css('user_total_anime, user_total_manga').map(&:content).map(&:to_i).
-        sum
+      xml.css('user_total_anime, user_total_manga').map(&:content).map(&:to_i).sum
     end
 
     def each
@@ -52,7 +51,7 @@ class ListImport
     def xml
       return @xml if @xml
 
-      data = open(input_file.path)
+      data = open(input_file.url)
       data = Zlib::GzipReader.new(data) if gzipped?         # Unzip
       data = data.read
       # We can't fix Xinil, but we can fix his mess.

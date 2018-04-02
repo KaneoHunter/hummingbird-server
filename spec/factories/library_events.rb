@@ -28,11 +28,19 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :library_event do
     association :library_entry, strategy: :build
     association :user, strategy: :build
 
-    event :updated
+    kind :updated
+
+    trait :with_anime do
+      anime_id 1
+    end
+
+    trait :with_manga do
+      manga_id 1
+    end
   end
 end

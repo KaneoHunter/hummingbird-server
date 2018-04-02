@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/LineLength
 # == Schema Information
 #
 # Table name: categories
@@ -24,8 +25,9 @@
 #  index_categories_on_parent_id  (parent_id)
 #  index_categories_on_slug       (slug)
 #
+# rubocop:enable Metrics/LineLength
 
-class Category < ActiveRecord::Base
+class Category < ApplicationRecord
   extend FriendlyId
   friendly_id :title, use: %i[slugged finders history]
   resourcify
@@ -49,7 +51,6 @@ class Category < ActiveRecord::Base
                       touch: true, counter_cache: 'child_count'
   has_many :children, class_name: 'Category',
                       foreign_key: 'parent_id', dependent: :destroy
-
 
   validates_attachment :image, content_type: {
     content_type: %w[image/jpg image/jpeg image/png]

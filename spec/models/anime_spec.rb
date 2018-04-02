@@ -12,25 +12,28 @@
 #  cover_image_content_type  :string(255)
 #  cover_image_file_name     :string(255)
 #  cover_image_file_size     :integer
+#  cover_image_meta          :text
 #  cover_image_processing    :boolean
 #  cover_image_top_offset    :integer          default(0), not null
 #  cover_image_updated_at    :datetime
 #  end_date                  :date
 #  episode_count             :integer
+#  episode_count_guess       :integer
 #  episode_length            :integer
 #  favorites_count           :integer          default(0), not null
 #  popularity_rank           :integer
 #  poster_image_content_type :string(255)
 #  poster_image_file_name    :string(255)
 #  poster_image_file_size    :integer
+#  poster_image_meta         :text
 #  poster_image_updated_at   :datetime
 #  rating_frequencies        :hstore           default({}), not null
 #  rating_rank               :integer
 #  slug                      :string(255)      indexed
 #  start_date                :date
-#  started_airing_date_known :boolean          default(TRUE), not null
 #  subtype                   :integer          default(1), not null
 #  synopsis                  :text             default(""), not null
+#  tba                       :string
 #  titles                    :hstore           default({}), not null
 #  user_count                :integer          default(0), not null, indexed
 #  created_at                :datetime         not null
@@ -94,6 +97,14 @@ RSpec.describe Anime, type: :model do
       expect(sep_anime.season).to eq(:fall)
       expect(oct_anime.season).to eq(:fall)
       expect(nov_anime.season).to eq(:fall)
+    end
+  end
+
+  describe 'sync_episodes' do
+    it 'should create episodes when episode_count is changed' do
+      create(:anime, episode_count: 5)
+      anime = Anime.last
+      expect(anime.episodes.length).to eq(anime.episode_count)
     end
   end
 end

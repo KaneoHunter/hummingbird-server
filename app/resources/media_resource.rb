@@ -46,7 +46,7 @@ class MediaResource < BaseResource
     # Ratings
     :average_rating, :rating_frequencies, :user_count, :favorites_count,
     # Dates
-    :start_date, :end_date,
+    :start_date, :end_date, :next_release,
     # Rankings
     :popularity_rank, :rating_rank,
     # Age Ratings
@@ -54,7 +54,7 @@ class MediaResource < BaseResource
     # Subtype
     :subtype,
     # Airing/Publishing Status
-    :status
+    :status, :tba
   # Images
   attributes :poster_image, :cover_image, format: :attachment
 
@@ -71,8 +71,17 @@ class MediaResource < BaseResource
     records.where(subtype: values)
   }
   filter :status, apply: ->(records, values, _opts) {
-    records.send(values[0]) if %w[tba unreleased upcoming current finished]
-                               .include? values[0]
+    values.inject(records.none) do |query, value|
+      if %w[tba unreleased upcoming current finished].include? value
+        query.or(records.send(value))
+      else
+        query
+      end
+    end
+  }
+  filter :since, apply: ->(records, values, _options) {
+    time = values.join.to_time
+    records.where('updated_at >= ?', time)
   }
 
   # Common ElasticSearch stuff
@@ -80,6 +89,7 @@ class MediaResource < BaseResource
   query :average_rating, NUMERIC_QUERY
   query :user_count, NUMERIC_QUERY
   query :subtype
+  query :status
   query :genres,
     apply: ->(values, _ctx) {
       { match: { genres: { query: values.join(' '), operator: 'and' } } }

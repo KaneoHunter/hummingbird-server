@@ -12,6 +12,7 @@
 #  thumbnail_content_type :string(255)
 #  thumbnail_file_name    :string(255)
 #  thumbnail_file_size    :integer
+#  thumbnail_meta         :text
 #  thumbnail_updated_at   :datetime
 #  titles                 :hstore           default({}), not null
 #  volume_number          :integer
@@ -21,11 +22,11 @@
 #
 # Indexes
 #
-#  index_chapters_on_manga_id  (manga_id)
+#  index_chapters_on_manga_id   (manga_id)
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :chapter do
     association :manga, factory: :manga, strategy: :build
     titles { { en_jp: Faker::Name.name } }

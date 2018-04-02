@@ -5,4 +5,7 @@ ActiveSupport::Inflector.inflections(:en) do |inflect|
   inflect.acronym 'XML'
   inflect.acronym 'SSO'
   inflect.acronym 'STI'
+  inflect.acronym 'AMA'
+  inflect.acronym 'ANN'
+  inflect.acronym 'MAL'
 end

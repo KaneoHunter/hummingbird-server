@@ -5,6 +5,8 @@
 #
 #  id           :integer          not null, primary key
 #  role         :integer          default(1), not null
+#  created_at   :datetime
+#  updated_at   :datetime
 #  character_id :integer          not null, indexed, indexed => [manga_id]
 #  manga_id     :integer          not null, indexed, indexed => [character_id]
 #
@@ -21,7 +23,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :manga_character do
     association :manga, factory: :manga, strategy: :build
     association :character, factory: :character, strategy: :build

@@ -4,6 +4,7 @@
 # Table name: follows
 #
 #  id          :integer          not null, primary key
+#  hidden      :boolean          default(FALSE), not null
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
 #  followed_id :integer          indexed => [follower_id]
@@ -16,7 +17,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :follow do
     association :follower, factory: :user, strategy: :build
     association :followed, factory: :user, strategy: :build

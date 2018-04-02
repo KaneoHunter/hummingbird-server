@@ -20,4 +20,22 @@
 # available at http://guides.rubyonrails.org/i18n.html.
 
 en:
-  hello: "Hello world"
+  notifications:
+    mention:
+      post: "%{actor} mentioned you in a post."
+      comment: "%{actor} mentioned you in a comment."
+    follow: "%{actor} followed you."
+    post_like: "%{actor} liked your post."
+    comment_like: "%{actor} liked your comment."
+    reply:
+      post:
+        you: "%{actor} replied to your post."
+        themself: "%{actor} replied to their post."
+        author: "%{actor} replied to %{author}'s post."
+        unknown: "%{actor} replied to a post."
+      comment:
+        you: "%{actor} replied to your comment."
+    invited: "%{actor} invited you to a group."
+    aired:
+      anime: "Episode %{number} of %{title} aired!"
+      manga: "Chapter %{number} of %{title} was released!"

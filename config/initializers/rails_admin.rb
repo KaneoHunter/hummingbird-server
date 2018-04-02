@@ -1,3 +1,5 @@
+require Rails.root.join('lib/rails_admin/config/fields/types/citext')
+
 RailsAdmin::ApplicationHelper.module_exec do
   def edit_user_link
     link_to "/users/#{_current_user.name}" do
@@ -48,13 +50,16 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
   # Display canonical_title for label on media
   config.label_methods += %i[canonical_title site_name]
 
-  # Omitted for security reasons (and Franchise/Casting/Installment deprecated)
+  # Omitted for security reasons (and Casting is deprecated)
   config.excluded_models += %w[
-    LeaderChatMessage LinkedAccount GroupTicketMessage PostLike ProfileLink
-    ReviewLike UserRole Role GroupTicket Franchise Casting Report CommentLike
-    Installment LinkedAccount::MyAnimeList
+    LeaderChatMessage LinkedAccount GroupTicketMessage PostLike ProfileLink ReviewLike UserRole Role
+    GroupTicket Casting Report CommentLike LinkedAccount::MyAnimeList MediaAttributeVote
+    LinkedAccount::YoutubeChannel UserIpAddress
   ]
 
+  # Franchise
+  config.model 'Franchise'
+  config.model('Installment') { parent Franchise }
   # Anime
   config.model 'Anime' do
     field :id
@@ -62,11 +67,11 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
     field :abbreviated_titles, :serialized do
       html_attributes rows: '6', cols: '70'
     end
-    fields :canonical_title, :synopsis, :slug, :subtype, :poster_image,
-      :cover_image, :age_rating, :age_rating_guide, :episode_count
+    fields :canonical_title, :synopsis, :slug, :subtype, :poster_image, :cover_image,
+      :age_rating, :age_rating_guide, :episode_count, :episode_count_guess
     include_all_fields
     exclude_fields :library_entries, :inverse_media_relationships, :favorites,
-      :producers, :average_rating, :cover_image_top_offset
+      :producers, :average_rating, :cover_image_top_offset, :release_schedule
     navigation_label 'Anime'
     weight(-20)
   end
@@ -81,12 +86,11 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
     field :abbreviated_titles, :serialized do
       html_attributes rows: '6', cols: '70'
     end
-    fields :canonical_title, :synopsis, :slug, :subtype, :poster_image,
-      :cover_image, :age_rating, :age_rating_guide, :chapter_count,
-      :volume_count
+    fields :canonical_title, :synopsis, :slug, :subtype, :poster_image, :cover_image,
+      :age_rating, :age_rating_guide, :chapter_count, :chapter_count_guess, :volume_count
     include_all_fields
     exclude_fields :library_entries, :inverse_media_relationships, :favorites,
-      :average_rating, :cover_image_top_offset
+      :average_rating, :cover_image_top_offset, :release_schedule
     navigation_label 'Manga'
     weight(-15)
   end
@@ -97,7 +101,7 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
     fields :id, :manga
     field(:titles, :serialized) { html_attributes rows: '6', cols: '70' }
     fields :canonical_title, :number, :synopsis, :published, :volume_number,
-      :length
+      :length, :thumbnail
     include_all_fields
     navigation_label 'Chapters'
   end
@@ -137,7 +141,7 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
 
   # Users
   config.model 'User' do
-    fields :id, :name, :email, :about, :avatar, :cover_image
+    fields :id, :name, :slug, :email, :about, :avatar, :cover_image
     include_all_fields
     exclude_fields :password_digest, :remember_created_at, :current_sign_in_at,
       :last_sign_in_at, :recommendations_up_to_date, :facebook_id, :twitter_id,
@@ -145,8 +149,8 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
       :dropbox_token, :dropbox_secret, :last_backup, :stripe_token,
       :stripe_customer_id, :import_status, :import_from, :import_error,
       :profile_completed, :feed_completed, :followers, :following, :comments,
-      :posts, :media_follows, :blocks, :last_recommendations_update, :title,
-      :library_entries
+      :posts, :blocks, :last_recommendations_update, :title,
+      :library_entries, :slug
     navigation_label 'Users'
     weight(-10)
   end
@@ -154,25 +158,54 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
   config.model('Favorite') { parent User }
   config.model('Block') { parent User }
   config.model('Follow') { parent User }
-  config.model('MediaFollow') { parent User }
   config.model('LibraryEntry') { parent User }
   config.model('LibraryEntryLog') { visible false }
+  config.model('LibraryEvent') { parent User }
+  config.model('MediaIgnore') { parent User }
+  config.model('PostFollow') { parent User }
+  config.model('NotificationSetting') { parent User }
+  config.model('OneSignalPlayer') { parent NotificationSetting }
+  config.model('CategoryFavorite') { parent User }
 
   # Feed
   config.model('Comment') { parent Post }
+  config.model('Repost') { parent Post }
+  config.model('Upload') { parent Post }
+
+  config.model('MediaReactionVote') { parent MediaReaction }
+
+  config.model('StreamingLink') { parent Streamer }
+
+  config.model('Video') { parent Episode }
+
+  config.model('AnimeMediaAttribute') { parent MediaAttribute }
+  config.model('MangaMediaAttribute') { parent MediaAttribute }
+  config.model('DramaMediaAttribute') { parent MediaAttribute }
+
+  config.model('CommunityRecommendationFollow') { parent CommunityRecommendation }
+  config.model('CommunityRecommendationRequest') { parent CommunityRecommendation }
+
+  config.model('AMASubscriber') { parent AMA }
 
   config.model 'Mapping' do
-    fields :id, :media
+    fields :id, :item
     field(:external_id) { label 'External ID' }
     field :external_site, :enum do
       enum do
         {
           'MyAnimeList Anime' => 'myanimelist/anime',
           'MyAnimeList Manga' => 'myanimelist/manga',
-          'AnimeNewsNetwork' => 'animenewsnetwork',
           'AniDB' => 'anidb',
+          'AnimeNewsNetwork' => 'animenewsnetwork',
+          'MangaUpdates' => 'mangaupdates',
+          'Hulu' => 'hulu',
+          'IMDB Episodes' => 'imdb/episodes',
+          'TheTVDB' => 'thetvdb',
           'TheTVDB Series' => 'thetvdb/series',
           'TheTVDB Season' => 'thetvdb/season',
+          'Aozora' => 'aozora',
+          'AniList' => 'anilist',
+          'Trakt' => 'trakt',
           'MyDramaList' => 'mydramalist'
         }
       end
@@ -183,8 +216,35 @@ RailsAdmin.config do |config| # rubocop:disable Metrics/BlockLength
   config.model 'Episode' do
     fields :id, :media
     field(:titles, :serialized) { html_attributes rows: '6', cols: '70' }
-    fields :canonical_title, :number, :season_number, :synopsis, :airdate,
+    fields :canonical_title, :number, :relative_number, :season_number, :synopsis, :airdate,
       :length, :thumbnail
+    include_all_fields
+    field :media_id do
+      filterable true
+    end
+    field :media_type do
+      filterable true
+    end
+  end
+
+  config.model 'Streamer' do
+    fields :id, :site_name
+    include_all_fields
+    exclude_fields :videos
+  end
+
+  config.model 'StreamingLink' do
+    fields :id, :media, :streamer, :url
+    field(:subs, :serialized) { html_attributes rows: '6', cols: '10' }
+    field(:dubs, :serialized) { html_attributes rows: '6', cols: '10' }
+    include_all_fields
+  end
+
+  config.model 'Video' do
+    fields :id, :url
+    field(:available_regions, :serialized) { html_attributes rows: '6', cols: '10' }
+    field(:embed_data, :serialized) { html_attributes rows: '6', cols: '70' }
+    fields :episode, :streamer, :sub_lang, :dub_lang
     include_all_fields
   end
 end

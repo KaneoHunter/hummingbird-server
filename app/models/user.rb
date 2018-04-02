@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/LineLength
 # == Schema Information
 #
 # Table name: users
@@ -5,10 +6,13 @@
 #  id                          :integer          not null, primary key
 #  about                       :string(500)      default(""), not null
 #  about_formatted             :text
+#  ao_password                 :string
+#  ao_pro                      :integer
 #  approved_edit_count         :integer          default(0)
 #  avatar_content_type         :string(255)
 #  avatar_file_name            :string(255)
 #  avatar_file_size            :integer
+#  avatar_meta                 :text
 #  avatar_processing           :boolean
 #  avatar_updated_at           :datetime
 #  bio                         :string(140)      default(""), not null
@@ -19,13 +23,14 @@
 #  cover_image_content_type    :string(255)
 #  cover_image_file_name       :string(255)
 #  cover_image_file_size       :integer
+#  cover_image_meta            :text
 #  cover_image_processing      :boolean
 #  cover_image_updated_at      :datetime
 #  current_sign_in_at          :datetime
 #  deleted_at                  :datetime
 #  dropbox_secret              :string(255)
 #  dropbox_token               :string(255)
-#  email                       :string(255)      default(""), not null, indexed
+#  email                       :string(255)      default(""), indexed
 #  favorites_count             :integer          default(0), not null
 #  feed_completed              :boolean          default(FALSE), not null
 #  followers_count             :integer          default(0)
@@ -34,7 +39,6 @@
 #  import_error                :string(255)
 #  import_from                 :string(255)
 #  import_status               :integer
-#  ip_addresses                :inet             default([]), is an Array
 #  language                    :string
 #  last_backup                 :datetime
 #  last_recommendations_update :datetime
@@ -44,9 +48,10 @@
 #  likes_received_count        :integer          default(0), not null
 #  location                    :string(255)
 #  mal_username                :string(255)
+#  media_reactions_count       :integer          default(0), not null
 #  name                        :string(255)
 #  ninja_banned                :boolean          default(FALSE)
-#  password_digest             :string(255)      default(""), not null
+#  password_digest             :string(255)      default("")
 #  past_names                  :string           default([]), not null, is an Array
 #  posts_count                 :integer          default(0), not null
 #  previous_email              :string
@@ -61,6 +66,7 @@
 #  sfw_filter                  :boolean          default(TRUE)
 #  share_to_global             :boolean          default(TRUE), not null
 #  sign_in_count               :integer          default(0)
+#  slug                        :citext           indexed
 #  stripe_token                :string(255)
 #  subscribed_to_newsletter    :boolean          default(TRUE)
 #  theme                       :integer          default(0), not null
@@ -71,6 +77,8 @@
 #  waifu_or_husbando           :string(255)
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
+#  ao_facebook_id              :string
+#  ao_id                       :string
 #  facebook_id                 :string(255)      indexed
 #  pinned_post_id              :integer
 #  pro_membership_plan_id      :integer
@@ -82,6 +90,7 @@
 #
 #  index_users_on_email        (email) UNIQUE
 #  index_users_on_facebook_id  (facebook_id) UNIQUE
+#  index_users_on_slug         (slug) UNIQUE
 #  index_users_on_to_follow    (to_follow)
 #  index_users_on_waifu_id     (waifu_id)
 #
@@ -89,6 +98,7 @@
 #
 #  fk_rails_bc615464bf  (pinned_post_id => posts.id)
 #
+# rubocop:enable Metrics/LineLength
 
 class User < ApplicationRecord
   include WithCoverImage
@@ -101,13 +111,22 @@ class User < ApplicationRecord
     feature featured features feed follow followers following hummingbird index
     javascript json kitsu sysadmin sysadministrator system unfollow user users
     wiki you staff mod
-  ].freeze
+  ].to_set.freeze
+  CONTROL_CHARACTERS = /\p{Line_Separator}|\p{Paragraph_Separator}|\p{Other}/u
+  BANNED_CHARACTERS = [
+    # Swastikas
+    "\u534D",
+    "\u5350"
+  ].join.freeze
 
   enum rating_system: %i[simple advanced regular]
   rolify after_add: :update_title, after_remove: :update_title
-  has_secure_password
+  has_secure_password validations: false
+  enum status: %i[unregistered registered aozora]
   update_index('users#user') { self }
+  update_algolia('AlgoliaUsersIndex')
   enum theme: %i[light dark]
+  enum ao_pro: %i[pro pro_plus]
 
   belongs_to :pro_membership_plan, required: false
   belongs_to :waifu, required: false, class_name: 'Character'
@@ -118,7 +137,6 @@ class User < ApplicationRecord
                        dependent: :destroy
   has_many :comments
   has_many :posts
-  has_many :media_follows, dependent: :destroy
   has_many :blocks, dependent: :destroy
   has_many :blocked, class_name: 'Block', foreign_key: 'blocked_id',
                      dependent: :destroy
@@ -128,7 +146,8 @@ class User < ApplicationRecord
   has_many :library_entries, dependent: :destroy
   has_many :favorites, dependent: :destroy
   has_many :reviews, dependent: :destroy
-  has_many :media_reactions
+  has_many :media_reactions, dependent: :destroy
+  has_many :media_reaction_votes, dependent: :destroy
   has_many :comment_likes, dependent: :destroy
   has_many :post_likes, dependent: :destroy
   has_many :post_follows, dependent: :destroy
@@ -150,41 +169,57 @@ class User < ApplicationRecord
   has_many :site_announcements
   has_many :stats, dependent: :destroy
   has_many :library_events, dependent: :destroy
-
-  validates :email, presence: true,
-                    uniqueness: { case_sensitive: false }, if: :email_changed?
+  has_many :notification_settings, dependent: :destroy
+  has_many :one_signal_players, dependent: :destroy
+  has_many :reposts, dependent: :destroy
+  has_many :ip_addresses, dependent: :destroy, class_name: 'UserIpAddress'
+  has_many :category_favorites, dependent: :destroy
+  validates :email, format: { with: /\A.*@.*\..*\z/, message: 'is not an email' },
+                    if: :email_changed?, allow_blank: true
+  validates :email, :name, :password, :slug, absence: true, if: :unregistered?
+  validates :email, :name, :password_digest, presence: true, if: :registered?
+  validates :email, uniqueness: { case_sensitive: false }, if: :email_changed?, allow_blank: true
+  with_options if: :slug_changed?, allow_nil: true do
+    validates :slug, uniqueness: { case_sensitive: false }
+    validates :slug, format: {
+      with: /\A[_A-Za-z0-9]+\z/,
+      message: 'can only contain letters, numbers, and underscores'
+    }
+    validates :slug, format: {
+      with: /\A[A-Za-z0-9]/,
+      message: 'must begin with a letter or number'
+    }
+    validates :slug, format: {
+      without: /\A[0-9]*\z/,
+      message: 'cannot be entirely numbers'
+    }
+    validates :slug, length: 3..20
+  end
+  validate :not_reserved_slug, if: ->(user) { user.slug.present? && user.slug_changed? }
+  validate :not_reserved_name, if: :name_changed?
+  validate :not_taken_on_aozora, on: :create
   validates :name, presence: true,
-                   uniqueness: { case_sensitive: false },
                    length: { minimum: 3, maximum: 20 },
-                   if: :name_changed?,
-                   format: {
-                     with: /\A[_A-Za-z0-9]+\z/,
-                     message: <<-EOF.squish
-                       can only contain letters, numbers, and underscores.
-                     EOF
-                   }
+                   if: ->(user) { user.registered? && user.name_changed? }
   validates :name, format: {
-    with: /\A[A-Za-z0-9]/,
-    message: 'must begin with a letter or number'
-  }
-  validates :name, format: {
-    without: /\A[0-9]*\z/,
-    message: 'cannot be entirely numbers'
-  }
-  validate :not_reserved_username
+    without: CONTROL_CHARACTERS,
+    message: 'cannot contain control characters, you silly haxx0r'
+  }, if: ->(user) { user.registered? && user.name_changed? }
+  validate :not_banned_characters
   validates :about, length: { maximum: 500 }
   validates :gender, length: { maximum: 20 }
-  validates :password_digest, presence: true
+  validates :password, length: { maximum: 72 }, if: :registered?
   validates :facebook_id, uniqueness: true, allow_nil: true
 
-  scope :active, ->() { where(deleted_at: nil) }
+  scope :active, -> { where(deleted_at: nil) }
+  scope :by_slug, ->(*slugs) { where(slug: slugs&.flatten) }
   scope :by_name, ->(*names) {
-    where('lower(users.name) IN (?)', names.flatten.map(&:downcase))
+    where('lower(users.name) IN (?)', names&.flatten&.compact&.map(&:downcase))
+  }
+  scope :by_email, ->(*emails) {
+    where('lower(users.email) IN (?)', emails&.flatten&.compact&.map(&:downcase))
   }
   scope :blocking, ->(*users) { where.not(id: users.flatten) }
-  scope :alts_of, ->(user) do
-    where('ip_addresses && ARRAY[?]::inet[]', user.ip_addresses.map(&:to_s))
-  end
   scope :followed_first, ->(user) {
     user_id = sanitize(user.id)
     joins(<<-SQL.squish).order('(f.id IS NULL) ASC')
@@ -194,14 +229,42 @@ class User < ApplicationRecord
     SQL
   }
 
-  # TODO: I think Devise can handle this for us
-  def self.find_for_auth(identification)
-    identification = [identification.downcase]
-    where('lower(email)=? OR lower(name)=?', *(identification * 2)).first
+  alias_method :flipper_id, :id
+
+  # @return [User,nil] the current user as stored in the Thread-local variable
+  def self.current
+    Thread.current[:current_user]
   end
 
-  def not_reserved_username
+  # Override the version provided by has_secure_password to accept the aozora password too
+  # @param unencrypted_password [String] the unencrypted password to test
+  def authenticate(unencrypted_password)
+    [password_digest, ao_password].compact.any? do |password|
+      BCrypt::Password.new(password).is_password?(unencrypted_password)
+    end && self
+  end
+
+  def self.find_for_auth(identification)
+    by_email(identification).or(by_slug(identification)).first
+  end
+
+  def not_reserved_slug
+    errors.add(:slug, 'is reserved') if RESERVED_NAMES.include?(slug&.downcase)
+  end
+
+  def not_reserved_name
     errors.add(:name, 'is reserved') if RESERVED_NAMES.include?(name.downcase)
+  end
+
+  def not_banned_characters
+    errors.add(:name, 'contains banned characters') if name&.count(BANNED_CHARACTERS) != 0
+  end
+
+  def not_taken_on_aozora
+    return unless Rails.env.production?
+    if Zorro::DB::User.find(email: /\A\s*#{email}\s*\z/i).count.nonzero? && ao_id.blank?
+      errors.add(:email, 'is already taken by an Aozora user')
+    end
   end
 
   def pro?
@@ -226,16 +289,18 @@ class User < ApplicationRecord
     past_names.first
   end
 
+  def one_signal_player_ids
+    one_signal_players.pluck(:player_id).compact
+  end
+
   def add_ip(new_ip)
-    unless ip_addresses.include?(new_ip)
-      ips = [new_ip, *ip_addresses].compact.first(PAST_IPS_LIMIT)
-      update_attribute(:ip_addresses, ips)
-    end
-    ip_addresses
+    ip_addresses.where(ip_address: new_ip).first_or_create
+  rescue ActiveRecord::RecordNotUnique # This can happen if two requests run at the same time
+    ip_addresses.where(ip_address: new_ip).first
   end
 
   def alts
-    User.alts_of(self)
+    UserIpAddress.where(ip_address: ip_addresses.select(:ip_address)).includes(:user).map(&:user)
   end
 
   def update_title(_role)
@@ -274,6 +339,10 @@ class User < ApplicationRecord
     @library_feed ||= PrivateLibraryFeed.new(id)
   end
 
+  def interest_timeline_for(interest)
+    "#{interest.to_s.classify}TimelineFeed".safe_constantize.new(id)
+  end
+
   def update_feed_completed
     return self if feed_completed?
     if library_entries.rated.count >= 5 && following.count >= 5 &&
@@ -300,9 +369,15 @@ class User < ApplicationRecord
     update_profile_completed.save!
   end
 
+  before_validation if: :email_changed? do
+    # Strip the email and downcase it just for good measure
+    self.email = email&.strip&.downcase
+  end
+
   before_destroy do
     # Destroy personal posts
     posts.where(target_group: nil, target_user: nil, media: nil).destroy_all
+    Post.only_deleted.where(user_id: id).delete_all
     # Reparent relationships to the "Deleted" user
     posts.update_all(user_id: -10)
     comments.update_all(user_id: -10)
@@ -314,26 +389,20 @@ class User < ApplicationRecord
   end
 
   after_commit on: :create do
-    # Send Confirmation Email
-    UserMailer.confirmation(self).deliver_later
-
     # Set up feeds
     profile_feed.setup!
     timeline.setup!
     site_announcements_feed.setup!
+    AnimeTimelineFeed.new(id).setup!
+    MangaTimelineFeed.new(id).setup!
 
     # Automatically join "Kitsu" group
-    GroupMember.create!(user: self, group_id: 1830) if Group.exists?(1830)
+    GroupMember.create!(user: self, group: Group.kitsu) if Group.kitsu
   end
 
-  after_save do
-    if share_to_global_changed?
-      if share_to_global
-        GlobalFeed.new.follow(profile_feed)
-      else
-        GlobalFeed.new.unfollow(profile_feed)
-      end
-    end
+  after_create do
+    # Set up Notification Settings for User
+    NotificationSetting.setup!(self)
   end
 
   before_update do
@@ -342,12 +411,14 @@ class User < ApplicationRecord
       self.past_names = [name_was, *past_names].first(PAST_NAMES_LIMIT)
     end
     self.previous_email = nil if confirmed_at_changed?
-    if email_changed? && !Rails.env.staging?
-      self.previous_email = email_was
-      self.confirmed_at = nil
-      UserMailer.confirmation(self).deliver_later
-    end
+    self.previous_email = email_was if email_changed?
     update_profile_completed
     update_feed_completed
+  end
+
+  after_commit if: ->(u) { u.email_changed? && !Rails.env.staging? } do
+    self.confirmed_at = nil
+    # Send Confirmation Email
+    UserMailer.confirmation(self).deliver_later
   end
 end

@@ -1,9 +1,7 @@
 class LibraryEventResource < BaseResource
   immutable
 
-  attributes :notes, :nsfw, :private, :progress, :rating, :reconsuming,
-    :reconsume_count, :volumes_owned, :time_spent, :status, :event,
-    :changed_data, :created_at
+  attributes :changed_data, :kind, :created_at
 
   has_one :library_entry
   has_one :user
@@ -12,7 +10,5 @@ class LibraryEventResource < BaseResource
   has_one :drama
 
   filter :user_id
-  # TODO: is this filter needed?
-  # I think it will need to have lambda attached
-  filter :created_at
+  filter :kind
 end

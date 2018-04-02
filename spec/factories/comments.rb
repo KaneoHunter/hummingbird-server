@@ -9,10 +9,12 @@
 #  content_formatted :text             not null
 #  deleted_at        :datetime         indexed
 #  edited_at         :datetime
+#  embed             :jsonb
 #  likes_count       :integer          default(0), not null
 #  replies_count     :integer          default(0), not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
+#  ao_id             :string
 #  parent_id         :integer          indexed
 #  post_id           :integer          not null, indexed
 #  user_id           :integer          not null
@@ -29,7 +31,7 @@
 #
 # rubocop:enable Metrics/LineLength
 
-FactoryGirl.define do
+FactoryBot.define do
   factory :comment do
     association :user, factory: :user, strategy: :build
     association :post, factory: :post, strategy: :build

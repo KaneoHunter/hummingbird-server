@@ -1,0 +1,2 @@
+class InterestGlobalFeed < Feed
+end
